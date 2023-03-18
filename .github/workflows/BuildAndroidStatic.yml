@@ -1,0 +1,65 @@
+# based on https://github.com/atteneder/draco/edit/unity/.github/workflows/unity.yml
+# which is for building the draco_unity binaries, but builds android, which google/draco does not
+name: Draco Android Static Library
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+ 
+  workflow_dispatch:
+  
+jobs:
+
+  android:
+
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        config:
+          - abi: arm64-v8a
+          - abi: armeabi-v7a
+          - abi: x86
+          - abi: x86_64
+
+    steps:
+    - uses: actions/checkout@v2
+    
+    #- uses: seanmiddleditch/gha-setup-ninja@v3
+
+    # Android
+    - name: install Android NDK
+      uses: nttld/setup-ndk@v1
+      id: setup-ndk
+      with:
+        ndk-version: r21e
+        add-to-path: false
+
+    #- name: configure_android_arm64-v8a
+    #  run: >
+    #    cmake -B build_android_arm64-v8a -DANDROID_ABI=arm64-v8a
+    #    -DCMAKE_BUILD_TYPE=MinSizeRel
+    #    -DANDROID_NDK=${{ steps.setup-ndk.outputs.ndk-path }}
+    #    -DCMAKE_TOOLCHAIN_FILE="${{ steps.setup-ndk.outputs.ndk-path }}/build/cmake/android.toolchain.cmake"
+    #    -DDRACO_UNITY_PLUGIN=OFF
+    #    -DBUILD_SHARED_LIBS=OFF
+    #    -DDRACO_BACKWARDS_COMPATIBILITY=OFF
+    - name: Build Android ${{matrix.config.abi}} Static Lib
+      run: |
+       cd Draco
+       mkdir androidbuild_${{matrix.config.abi}}
+       cd androidbuild_${{matrix.config.abi}}
+       cmake ../ -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/android.cmake -DBUILD_SHARED_LIBS=OFF -DDRACO_ANDROID_NDK_PATH=${{ steps.setup-ndk.outputs.ndk-path }} -DCMAKE_BUILD_TYPE=MinSizeRel -DANDROID_ABI=${{matrix.config.abi}}
+       cmake --build . --target draco_static
+       find ./ -print
+
+    - name: Upload Android ${{matrix.config.abi}} Artifact
+      uses: actions/upload-artifact@v2
+      with:
+        name: draco_android_${{matrix.config.abi}}
+        path: Draco/androidbuild_${{matrix.config.abi}}/libdraco.a
+
